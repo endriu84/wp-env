@@ -5,6 +5,7 @@ set -e
 
 cmd=wp-env
 wp_env_dir=~/wp-env
+env_file=.wp-env.json
 
 project_dir=${PWD}
 project_name=${PWD##*/}
@@ -18,8 +19,8 @@ compose_tpl_file="${script_dir}/.wp-env.sh/docker-compose.yml"
 compose_file="${wp_abspath}/docker-compose.yml"
 toolbox="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
 
-if [ ! -r "${project_dir}/wp-env.json" ]; then
-    echo "Couldn't find wp-env.json file. Aborting."
+if [ ! -r "${project_dir}/${env_file}" ]; then
+    echo "Couldn't find ${env_file} file. Aborting."
     exit 1
 fi
 
@@ -31,7 +32,7 @@ mkdir -p ${wp_abspath}
 
 create_compose_file() {
     
-    port=$(jq -r '.port' wp-env.json)
+    port=$(jq -r '.port' ${env_file})
     if [ "${port}" = "null" ]; then
         port=9090
     fi
@@ -45,7 +46,7 @@ compose_up() {
 
     if [ -z "$container_id" ]; then
 
-        docker-compose -f ${compose_file} up -d --build
+        docker-compose -f ${compose_file} up -d --build > /dev/null 2>&1
         docker exec -ti ${project_name}_www chown -R 1000:1000 /var/www/html
     fi
 }
@@ -62,7 +63,7 @@ compose_down() {
 
 install_plugins() {
 
-    plugins=$(jq -r '.plugins | .[]' wp-env.json)
+    plugins=$(jq -r '.plugins | .[]' ${env_file})
     # printf "%s\n" "${plugins[@]}"
     if [ "${plugins}" != "null" ]; then
         for plugin in ${plugins[@]}; do
@@ -74,7 +75,7 @@ install_plugins() {
 
 install_themes() {
 
-    themes=$(jq -r '.themes | .[]' wp-env.json)
+    themes=$(jq -r '.themes | .[]' ${env_file})
     if [ "${themes}" != "null" ]; then
         first_run=1
         for theme in ${themes[@]}; do
@@ -90,10 +91,10 @@ install_themes() {
 
 setup_config() {
 
-    config_keys=$(jq -r '.config | keys | .[]' wp-env.json)
+    config_keys=$(jq -r '.config | keys | .[]' ${env_file})
     # printf "%s\n" "${config[@]}"
     for key in ${config_keys[@]}; do
-        value=$(jq -r ".config | .${key}" wp-env.json)
+        value=$(jq -r ".config | .${key}" ${env_file})
         if [ "${value}" = "true" ] || [ "${value}" = "false" ]; then
             $toolbox config set ${key} ${value} --add --raw
         else
@@ -104,7 +105,7 @@ setup_config() {
 
 udpate_core() {
 
-    version=$(jq -r '.core' wp-env.json)
+    version=$(jq -r '.core' ${env_file})
     current_version=$(${toolbox} core version)
 
     if [ "${version}" != "${current_version}" ]; then
@@ -114,13 +115,14 @@ udpate_core() {
 
 rm_files() {
 
+    ${toolbox} db drop --yes
     rm -rf ${wp_abspath}
 }
 
 maybe_update() {
 
-    org_file="${project_dir}/wp-env.json"
-    file_copy="${wp_abspath}/wp-env.json"
+    org_file="${project_dir}/${env_file}"
+    file_copy="${wp_abspath}/${env_file}"
 
     if [ ! -r "${file_copy}" ]; then
         cp $org_file $file_copy
