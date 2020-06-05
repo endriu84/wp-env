@@ -170,6 +170,9 @@ case "${1:-}" in
         compose_down
         rm_files
     ;;
+    wp)
+        ${toolbox} ${2}
+    ;;
     *)
         >&2 echo "Bad command ${1:-}"
         exit 1
