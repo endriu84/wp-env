@@ -61,6 +61,11 @@ compose_down() {
     fi
 }
 
+install_core() {
+
+    ${toolbox} core install --url="localhost:${port}" --title=${project_name} --admin_user=admin --admin_password=password --admin_email=admin@email.com --skip-email
+}
+
 install_plugins() {
 
     plugins=$(jq -r '.plugins | .[]' ${env_file})
@@ -131,6 +136,7 @@ maybe_update() {
     fi
 
     setup_config
+    install_core
     install_plugins
     install_themes
     udpate_core
