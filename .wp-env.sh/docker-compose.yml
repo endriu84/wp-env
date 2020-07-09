@@ -8,7 +8,7 @@ services:
     ports:
       - %PORT%:80
     volumes:
-      # - ./config/php.conf.ini:/usr/local/etc/php/conf.d/conf.ini
+      - ./config/php.ini:/usr/local/etc/php/conf.d/conf.ini
       - %WP_ENV_DIR%/%PROJECT_NAME%:/var/www/html # Full wordpress project
       - %VOLUME% # Asset (Plugin or Theme) development
     environment:

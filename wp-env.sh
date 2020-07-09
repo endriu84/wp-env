@@ -17,7 +17,7 @@ wp_abspath=${wp_env_dir}/${wp_folder}
 
 compose_tpl_file="${script_dir}/.wp-env.sh/docker-compose.yml"
 compose_file="${wp_abspath}/docker-compose.yml"
-toolbox="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
+wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
 
 if [ ! -r "${project_dir}/${env_file}" ]; then
     echo "Couldn't find ${env_file} file. Aborting."
@@ -28,7 +28,7 @@ fi
 command -v jq >/dev/null 2>&1 || { echo >&2 "jq it's not installed. Aborting."; exit 1; }
 
 # -p - if not exists
-mkdir -p ${wp_abspath}
+mkdir -p "${wp_abspath}"
 
 create_compose_file() {
     
@@ -42,28 +42,28 @@ create_compose_file() {
 
 compose_up() {
 
-    container_id="$(docker ps -q -f name=${project_name}_www)"
+    container_id=$(docker ps -q -f name="${project_name}"_www)
 
-    if [ -z "$container_id" ]; then
+    if [ -z "${container_id}" ]; then
 
-        docker-compose -f ${compose_file} up -d --build > /dev/null 2>&1
-        docker exec -ti ${project_name}_www chown -R 1000:1000 /var/www/html
+        docker-compose -f "${compose_file}" up -d --build > /dev/null 2>&1
+        docker exec -ti "${project_name}"_www chown -R 1000:1000 /var/www/html
     fi
 }
 
 compose_down() {
 
-    container_id="$(docker ps -qa -f name=${project_name}_www)"
+    container_id=$(docker ps -qa -f name="${project_name}"_www)
 
-    if [ ! -z "$container_id" ]; then
+    if [ ! -z "${container_id}" ]; then
 
-        docker-compose -f ${compose_file} down
+        docker-compose -f "${compose_file}" down
     fi
 }
 
 install_core() {
 
-    ${toolbox} core install --url="localhost:${port}" --title=${project_name} --admin_user=admin --admin_password=password --admin_email=admin@email.com --skip-email
+    ${wp_cli} core install --url="localhost:${port}" --title="${project_name}" --admin_user=admin --admin_password=password --admin_email=admin@email.com --skip-email
 }
 
 install_plugins() {
@@ -71,9 +71,9 @@ install_plugins() {
     plugins=$(jq -r '.plugins | .[]' ${env_file})
     # printf "%s\n" "${plugins[@]}"
     if [ "${plugins}" != "null" ]; then
-        for plugin in ${plugins[@]}; do
+        for plugin in "${plugins[@]}"; do
 
-            ${toolbox} plugin install ${plugin} --activate --force
+            ${wp_cli} plugin install "${plugin}" --activate --force
         done
     fi
 }
@@ -83,12 +83,12 @@ install_themes() {
     themes=$(jq -r '.themes | .[]' ${env_file})
     if [ "${themes}" != "null" ]; then
         first_run=1
-        for theme in ${themes[@]}; do
+        for theme in "${themes[@]}"; do
             if [ "${first_run}" == 1 ]; then
-                ${toolbox} theme install ${theme} --activate --force
+                ${wp_cli} theme install "${theme}" --activate --force
                 first_run=0
             else
-                ${toolbox} theme install ${theme} --force
+                ${wp_cli} theme install "${theme}" --force
             fi
         done
     fi
@@ -98,12 +98,12 @@ setup_config() {
 
     config_keys=$(jq -r '.config | keys | .[]' ${env_file})
     # printf "%s\n" "${config[@]}"
-    for key in ${config_keys[@]}; do
+    for key in "${config_keys[@]}"; do
         value=$(jq -r ".config | .${key}" ${env_file})
         if [ "${value}" = "true" ] || [ "${value}" = "false" ]; then
-            $toolbox config set ${key} ${value} --add --raw
+            $wp_cli config set "${key}" "${value}" --add --raw
         else
-            $toolbox config set ${key} ${value} --add
+            $wp_cli config set "${key}" "${value}" --add
         fi
     done
 }
@@ -111,17 +111,17 @@ setup_config() {
 udpate_core() {
 
     version=$(jq -r '.core' ${env_file})
-    current_version=$(${toolbox} core version)
+    current_version=$(${wp_cli} core version)
 
     if [ "${version}" != "${current_version}" ]; then
-        ${toolbox} core update --version=${version} --force
+        ${wp_cli} core update --version="${version}" --force
     fi
 }
 
 rm_files() {
 
-    ${toolbox} db drop --yes
-    rm -rf ${wp_abspath}
+    ${wp_cli} db drop --yes
+    rm -rf "${wp_abspath}"
 }
 
 maybe_update() {
@@ -130,7 +130,7 @@ maybe_update() {
     file_copy="${wp_abspath}/${env_file}"
 
     if [ ! -r "${file_copy}" ]; then
-        cp $org_file $file_copy
+        cp "$org_file" "$file_copy"
     elif cmp -s "${org_file}" "${file_copy}" ; then
         return
     fi
@@ -177,7 +177,7 @@ case "${1:-}" in
         rm_files
     ;;
     wp)
-        ${toolbox} ${2}
+        ${wp_cli} "${2}"
     ;;
     *)
         >&2 echo "Bad command ${1:-}"
