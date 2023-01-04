@@ -4,28 +4,22 @@ services:
   %PROJECT_NAME%_www:
     container_name: %PROJECT_NAME%_www
     build: 
-      context: ~/Docker/dockerfiles/wordpress/php7.3/apache/
+      context: ./
+      args:
+        - INSTALL_XDEBUG=true
+        - INSTALL_PHPREDIS=false
+        - INSTALL_IONCUBE=false
+        - INSTALL_PHPINTL=false
+        - INSTALL_EXIF=false
     ports:
       - %PORT%:80
     volumes:
-      - ./config/php.ini:/usr/local/etc/php/conf.d/conf.ini
-      - %WP_ENV_DIR%/%PROJECT_NAME%:/var/www/html # Full wordpress project
+      - %WP_ABSPATH%:/var/www/html # Full wordpress project
       - %VOLUME% # Asset (Plugin or Theme) development
+      - ./.profiler:/run/profiler
+    working_dir: /var/www/html/
     environment:
-      WORDPRESS_DB_HOST: mariadb
-      WORDPRESS_DB_NAME: %PROJECT_NAME%
-      WORDPRESS_DB_USER: root
-      WORDPRESS_DB_PASSWORD: imprezautomka
-    networks:
-      - local_proxy
-
-  %PROJECT_NAME%_wpcli:
-    container_name: %PROJECT_NAME%_wpcli
-    build: 
-      context: ~/Docker/dockerfiles/wordpress/php7.3/cli/
-    volumes:
-      - %WP_ENV_DIR%/%PROJECT_NAME%:/var/www/html # Full wordpress project
-      - %VOLUME% # Asset (Plugin or Theme) development
+      XDEBUG_CONFIG: profiler_output_name=%PROJECT_NAME%.out.%p
     networks:
       - local_proxy
 

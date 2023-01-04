@@ -3,21 +3,29 @@
 # Exit on (non catched) error 
 set -e
 
+# debuging
+# set -x
+
 cmd=wp-env
-wp_env_dir=~/wp-env
-env_file=.wp-env.json
+# wp_env_dir=~/wp-env
+env_file=".wp-env.json"
 
 project_dir=${PWD}
 project_name=${PWD##*/}
 
 script_dir=$(dirname "$0")
 
-wp_folder=${project_name}
-wp_abspath=${wp_env_dir}/${wp_folder}
+# wp_folder=${project_name}
+wp_folder="core"
+# wp_abspath=${wp_env_dir}/${wp_folder}
+wp_abspath=${project_dir}/${wp_folder}
 
 compose_tpl_file="${script_dir}/.wp-env.sh/docker-compose.yml"
-compose_file="${wp_abspath}/docker-compose.yml"
-wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
+dockerfile_tpl="${script_dir}/.wp-env.sh/Dockerfile"
+compose_file="${project_dir}/docker-compose.yml"
+app_container="docker exec --user=www-data ${project_name}_www"
+# wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
+wp_cli="/home/andrzej/.config/composer/vendor/bin/wp --path=${wp_abspath}"
 
 if [ ! -r "${project_dir}/${env_file}" ]; then
     echo "Couldn't find ${env_file} file. Aborting."
@@ -37,7 +45,11 @@ create_compose_file() {
         port=9090
     fi
     # plugin version
-    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ENV_DIR%|${wp_env_dir}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/:/var/www/html/wp-content/plugins/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
+    # sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/${project_name}/:/var/www/html/wp-content/plugins/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
+    # theme version
+    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/${project_name}/:/var/www/html/wp-content/themes/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
+
+    cp "${dockerfile_tpl}" "${project_dir}/Dockerfile"
 }
 
 compose_up() {
@@ -63,16 +75,17 @@ compose_down() {
 
 install_core() {
 
+#  ${local_wpcli} --path=${wp_abspath} db create --quiet || true > /dev/null
+    ${wp_cli} db create --quiet || true > /dev/null
     ${wp_cli} core install --url="localhost:${port}" --title="${project_name}" --admin_user=admin --admin_password=password --admin_email=admin@email.com --skip-email
 }
 
 install_plugins() {
 
-    plugins=$(jq -r '.plugins | .[]' ${env_file})
+    plugins=$(jq -r '.plugins | .[]?' ${project_dir}/${env_file})
     # printf "%s\n" "${plugins[@]}"
-    if [ "${plugins}" != "null" ]; then
+    if [ "${plugins}" != "" ]; then
         for plugin in "${plugins[@]}"; do
-
             ${wp_cli} plugin install "${plugin}" --activate --force
         done
     fi
@@ -80,12 +93,15 @@ install_plugins() {
 
 install_themes() {
 
-    themes=$(jq -r '.themes | .[]' ${env_file})
-    if [ "${themes}" != "null" ]; then
+    themes=$(jq -r '.themes | .[]?' ${project_dir}/${env_file})
+    if [ "${themes}" != "" ]; then
         first_run=1
         for theme in "${themes[@]}"; do
             if [ "${first_run}" == 1 ]; then
                 ${wp_cli} theme install "${theme}" --activate --force
+                
+                # below would not activate local theme becouse it is called from outside of the container, thous theme folder is empty
+                # ${wp_cli} theme activate "${theme}" 
                 first_run=0
             else
                 ${wp_cli} theme install "${theme}" --force
@@ -96,22 +112,32 @@ install_themes() {
 
 setup_config() {
 
-    config_keys=$(jq -r '.config | keys | .[]' ${env_file})
-    # printf "%s\n" "${config[@]}"
-    for key in "${config_keys[@]}"; do
-        value=$(jq -r ".config | .${key}" ${env_file})
+    # config_keys=$(jq -r '.config | keys | .[]' ${env_file})
+    # printf "%s\n" "${config_keys[@]}"
+    # $wp_cli config create --dbname=testing --dbuser=wp --dbpass=securepswd --locale=en_EN || true
+    cp "${wp_abspath}/wp-config-sample.php" "${wp_abspath}/wp-config.php"
+    $wp_cli config shuffle-salts
+    for key in $(jq -r '.config | keys | .[]' ${project_dir}/${env_file}); do
+        value="$(jq -r ".config | .${key}" ${project_dir}/${env_file})"
         if [ "${value}" = "true" ] || [ "${value}" = "false" ]; then
             $wp_cli config set "${key}" "${value}" --add --raw
         else
             $wp_cli config set "${key}" "${value}" --add
         fi
+        # export "${key}=${value}"
+        # ${app_container} export "${key}=${value}"
+        # echo "${key}=${value}" >> "${wp_abspath}/env_FILE"
     done
 }
 
 udpate_core() {
 
-    version=$(jq -r '.core' ${env_file})
+    version=$(jq -r '.core' ${project_dir}/${env_file})
     current_version=$(${wp_cli} core version)
+
+    if [ -z "${version}" ]; then
+        return
+    fi
 
     if [ "${version}" != "${current_version}" ]; then
         ${wp_cli} core update --version="${version}" --force
