@@ -12,17 +12,18 @@ env_file=".wp-env.json"
 
 project_dir=${PWD}
 project_name=${PWD##*/}
+parent_dir=$(dirname "$project_dir")
 
 script_dir=$(dirname "$0")
 
 # wp_folder=${project_name}
 wp_folder="core"
 # wp_abspath=${wp_env_dir}/${wp_folder}
-wp_abspath=${project_dir}/${wp_folder}
+wp_abspath=${parent_dir}/${wp_folder}
 
 compose_tpl_file="${script_dir}/.wp-env.sh/docker-compose.yml"
 dockerfile_tpl="${script_dir}/.wp-env.sh/Dockerfile"
-compose_file="${project_dir}/docker-compose.yml"
+compose_file="${parent_dir}/docker-compose.yml"
 app_container="docker exec --user=www-data ${project_name}_www"
 # wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
 wp_cli="/home/andrzej/.config/composer/vendor/bin/wp --path=${wp_abspath}"
@@ -47,9 +48,9 @@ create_compose_file() {
     # plugin version
     # sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/${project_name}/:/var/www/html/wp-content/plugins/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
     # theme version
-    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/${project_name}/:/var/www/html/wp-content/themes/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
+    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${parent_dir}/${project_name}/:/var/www/html/wp-content/themes/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
 
-    cp "${dockerfile_tpl}" "${project_dir}/Dockerfile"
+    cp "${dockerfile_tpl}" "${parent_dir}/Dockerfile"
 }
 
 compose_up() {
@@ -193,6 +194,7 @@ case "${1:-}" in
     start)
         create_compose_file
         compose_up
+        sleep 3
         maybe_update
     ;;
     stop)
