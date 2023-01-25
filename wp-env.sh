@@ -14,6 +14,9 @@ project_dir=${PWD}
 project_name=${PWD##*/}
 parent_dir=$(dirname "$project_dir")
 
+resource=$(dirname "$parent_dir")
+resource=${resource##*/}
+
 script_dir=$(dirname "$0")
 
 # wp_folder=${project_name}
@@ -26,7 +29,7 @@ dockerfile_tpl="${script_dir}/.wp-env.sh/Dockerfile"
 compose_file="${parent_dir}/docker-compose.yml"
 app_container="docker exec --user=www-data ${project_name}_www"
 # wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
-wp_cli="/home/andrzej/.config/composer/vendor/bin/wp --path=${wp_abspath}"
+wp_cli="wp --path=${wp_abspath}"
 
 if [ ! -r "${project_dir}/${env_file}" ]; then
     echo "Couldn't find ${env_file} file. Aborting."
@@ -45,10 +48,11 @@ create_compose_file() {
     if [ "${port}" = "null" ]; then
         port=9090
     fi
+
     # plugin version
     # sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${project_dir}/${project_name}/:/var/www/html/wp-content/plugins/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
     # theme version
-    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${parent_dir}/${project_name}/:/var/www/html/wp-content/themes/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
+    sed -e "s/%PROJECT_NAME%/${project_name}/g" -e "s|%WP_ABSPATH%|${wp_abspath}|g" -e "s/%PORT%/${port}/" -e "s|%VOLUME%|${parent_dir}/${project_name}/:/var/www/html/wp-content/${resource}/${project_name}|g" "${compose_tpl_file}" > "${compose_file}"
 
     cp "${dockerfile_tpl}" "${parent_dir}/Dockerfile"
 }

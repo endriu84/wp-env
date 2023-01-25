@@ -1,4 +1,4 @@
-FROM wordpress:6.1-php8.1-apache
+FROM wordpress:6.1-php8.0-apache
 
 LABEL maintainer="Andrzej Misiewicz <andrzej@pandasoft.pl>"
 
