@@ -29,7 +29,10 @@ dockerfile_tpl="${script_dir}/.wp-env.sh/Dockerfile"
 compose_file="${parent_dir}/docker-compose.yml"
 app_container="docker exec --user=www-data ${project_name}_www"
 # wp_cli="docker-compose -f ${compose_file} run --rm ${project_name}_wpcli wp"
-wp_cli="wp --path=${wp_abspath}"
+wp()
+{
+    wp --path="${wp_abspath}" "$@"
+}
 
 if [ ! -r "${project_dir}/${env_file}" ]; then
     echo "Couldn't find ${env_file} file. Aborting."
